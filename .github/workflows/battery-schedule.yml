@@ -1,4 +1,3 @@
-
 name: Fox ESS Battery Automation
 
 on:
@@ -22,7 +21,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install foxesscloud requests
+        run: pip install foxesscloud requests matplotlib
 
       - name: Determine Action and Run
         env:
