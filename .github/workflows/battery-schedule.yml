@@ -2,11 +2,20 @@ name: Fox ESS Battery Automation
 
 on:
   schedule:
-    # 10:00 PM Sydney AEDT (11:00 UTC) -> Turns Mode Scheduler OFF (0% DoD)
+    # 10:00 PM AEDT (11:00 UTC) -> Turn OFF
     - cron: '0 11 * * *'
-    # 10:00 AM Sydney AEDT (23:00 UTC) -> Turns Mode Scheduler ON (Resumes schedule)
+    # 10:00 AM AEDT (23:00 UTC) -> Turn ON
     - cron: '0 23 * * *'
-  workflow_dispatch: # Allows manual trigger anytime
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to run (on/off)'
+        required: true
+        default: 'on'
+        type: choice
+        options:
+          - 'on'
+          - 'off'
 
 jobs:
   run-scheduler:
@@ -23,15 +32,21 @@ jobs:
       - name: Install dependencies
         run: pip install foxesscloud requests matplotlib
 
-      - name: Determine Action and Run
+      - name: Determine and Run Action
         env:
           FOX_API_KEY: ${{ secrets.FOX_API_KEY }}
         run: |
-          CURRENT_HOUR=$(date -u +%H)
-          if [ "$CURRENT_HOUR" -eq 11 ]; then
-            python scheduler.py off
-          elif [ "$CURRENT_HOUR" -eq 23 ]; then
-            python scheduler.py on
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python scheduler.py ${{ github.event.inputs.action }}
           else
-            python scheduler.py off
+            CURRENT_HOUR=$(date -u +%H)
+            # 23:00 UTC = 10:00 AM AEDT -> Turn ON (allows a 3-hour window for delays)
+            if [ "$CURRENT_HOUR" -ge 22 ] || [ "$CURRENT_HOUR" -le 1 ]; then
+              python scheduler.py on
+            # 11:00 UTC = 10:00 PM AEDT -> Turn OFF
+            elif [ "$CURRENT_HOUR" -ge 10 ] && [ "$CURRENT_HOUR" -le 13 ]; then
+              python scheduler.py off
+            else
+              python scheduler.py on
+            fi
           fi
