@@ -22,7 +22,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install foxesscloud
+        run: pip install foxesscloud requests
 
       - name: Determine Action and Run
         env:
