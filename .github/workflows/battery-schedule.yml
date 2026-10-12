@@ -1,1 +1,38 @@
 
+name: Fox ESS Battery Automation
+
+on:
+  schedule:
+    # 10:00 PM Sydney AEDT (11:00 UTC) -> Turns Mode Scheduler OFF (0% DoD)
+    - cron: '0 11 * * *'
+    # 10:00 AM Sydney AEDT (23:00 UTC) -> Turns Mode Scheduler ON (Resumes schedule)
+    - cron: '0 23 * * *'
+  workflow_dispatch: # Allows manual trigger anytime
+
+jobs:
+  run-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install foxesscloud
+
+      - name: Determine Action and Run
+        env:
+          FOX_API_KEY: ${{ secrets.FOX_API_KEY }}
+        run: |
+          CURRENT_HOUR=$(date -u +%H)
+          if [ "$CURRENT_HOUR" -eq 11 ]; then
+            python scheduler.py off
+          elif [ "$CURRENT_HOUR" -eq 23 ]; then
+            python scheduler.py on
+          else
+            python scheduler.py off
+          fi
