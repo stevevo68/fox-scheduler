@@ -11,32 +11,26 @@ def main():
         print("ERROR: FOX_API_KEY environment variable not set.")
         sys.exit(1)
 
+    # Configure authentication
     f.api_key = api_key
-    if username and password:
+    if username:
         f.username = username
+    if password:
         f.password = password
 
     action = sys.argv[1] if len(sys.argv) > 1 else "on"
     print(f"Executing GitHub Action -> Action: {action}")
 
-    # Initialize device details
-    devices = f.get_device()
-    if not devices:
-        print("ERROR: No Fox ESS devices found.")
-        sys.exit(1)
-
-    device_sn = devices[0].get('deviceSN') or devices[0].get('sn')
-    print(f"Target Device SN: {device_sn}")
-
-    # Sync schedule state
-    f.get_schedule()
+    # Load inverter device details
+    device_info = f.get_device()
+    print(f"Connected to device successfully.")
 
     if action == "off":
-        print("Switching inverter work mode to Self-Use...")
+        print("Switching inverter work mode to SelfUse...")
         result = f.set_work_mode('SelfUse')
         print(f"Set work mode result: {result}")
     else:
-        print("Applying Feed-in First mode...")
+        print("Switching inverter work mode to FeedInFirst...")
         result = f.set_work_mode('FeedInFirst')
         print(f"Set work mode result: {result}")
 
