@@ -18,22 +18,41 @@ def main():
     if password:
         f.password = password
 
-    action = sys.argv[1] if len(sys.argv) > 1 else "on"
+    action = sys.argv[1] if len(sys.argv) > 1 else "off"
     print(f"Executing GitHub Action -> Action: {action}")
 
-    # Explicitly target your H3 Smart Inverter serial number
+    # Explicitly bind your H3 Smart Inverter serial number
     device_sn = "60HD103058XM117"
     print(f"Target Inverter SN: {device_sn}")
     f.device_sn = device_sn
 
+    # Initialize schedule session state (required before schedule/mode calls)
+    try:
+        f.get_schedule()
+    except Exception as e:
+        print(f"Note on get_schedule: {e}")
+
     if action == "off":
-        print("Switching inverter work mode to Self-Use...")
-        result = f.set_work_mode('SelfUse')
-        print(f"Set work mode result: {result}")
+        print("Disabling Mode Scheduler and switching to SelfUse...")
+        try:
+            # Disable active schedule / Mode Scheduler lockout
+            res_sched = f.set_schedule(enable=0)
+            print(f"Disable schedule result: {res_sched}")
+        except Exception as e:
+            print(f"Disable schedule note: {e}")
+            
+        try:
+            res_mode = f.set_work_mode('SelfUse')
+            print(f"Set work mode result: {res_mode}")
+        except Exception as e:
+            print(f"Set work mode error: {e}")
     else:
-        print("Switching inverter work mode to FeedInFirst...")
-        result = f.set_work_mode('FeedInFirst')
-        print(f"Set work mode result: {result}")
+        print("Switching work mode to FeedInFirst...")
+        try:
+            res_mode = f.set_work_mode('FeedInFirst')
+            print(f"Set work mode result: {res_mode}")
+        except Exception as e:
+            print(f"Set work mode error: {e}")
 
 if __name__ == "__main__":
     main()
