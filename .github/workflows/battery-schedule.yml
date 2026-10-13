@@ -28,7 +28,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install foxesscloud
-        run: pip install foxesscloud requests
+        run: pip install foxesscloud requests matplotlib
 
       - name: Run scheduler script
         env:
