@@ -1,5 +1,7 @@
 import os
 import sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import foxesscloud.openapi as f
 
 def main():
@@ -13,47 +15,52 @@ def main():
     f.api_key = api_key
     f.device_sn = device_sn
 
-    action = sys.argv[1] if len(sys.argv) > 1 else "off"
-    print(f"=== Fox ESS Scheduler Control ===")
-    print(f"Action requested : {action}")
-    print(f"Inverter SN      : {device_sn}")
+    # Real Sydney time (handles daylight saving automatically)
+    now = datetime.now(ZoneInfo("Australia/Sydney"))
+    hour = now.hour
 
-    # Load current schedule state
+    print(f"=== Fox ESS Scheduler Control ===")
+    print(f"Sydney time : {now.strftime('%Y-%m-%d %H:%M %Z')}")
+    print(f"Inverter SN : {device_sn}")
+
+    # Manual force from GitHub button
+    if len(sys.argv) > 1:
+        action = sys.argv[1].lower()
+        print(f"Manual action: {action}")
+    else:
+        if hour == 14:          # 2:00 PM Sydney → OFF
+            action = "off"
+        elif hour == 10:        # 10:00 AM Sydney → ON
+            action = "on"
+        else:
+            print("Not 10:00 AM or 2:00 PM in Sydney — nothing to do.")
+            return
+
+    print(f"Action      : {action}")
+
     try:
         schedule = f.get_schedule()
-        print(f"Current scheduler enable flag: {schedule.get('enable') if schedule else 'unknown'}")
+        print(f"Current enable: {schedule.get('enable') if schedule else 'unknown'}")
     except Exception as e:
-        print(f"Warning while reading schedule: {e}")
+        print(f"Warning: {e}")
 
-    if action.lower() in ["off", "false", "0"]:
-        print("→ Disabling Mode Scheduler (Self-use mode)...")
-        try:
-            result = f.set_schedule(enable=0)
-            print(f"Disable result: {result}")
-        except Exception as e:
-            print(f"Error disabling scheduler: {e}")
-            sys.exit(1)
+    if action in ["off", "false", "0"]:
+        print("→ Disabling Mode Scheduler (Self-use)...")
+        result = f.set_schedule(enable=0)
+        print(f"Result: {result}")
 
-    elif action.lower() in ["on", "true", "1"]:
+    elif action in ["on", "true", "1"]:
         print("→ Enabling Mode Scheduler...")
-        try:
-            schedule = f.get_schedule()
-            periods = schedule.get('periods') if schedule else None
+        schedule = f.get_schedule()
+        periods = schedule.get('periods') if schedule else None
 
-            if periods:
-                result = f.set_schedule(periods=periods, enable=1)
-            else:
-                # Fallback: full day SelfUse
-                period = f.set_period(0, 24, "SelfUse", min_soc=10)
-                result = f.set_schedule(periods=[period], enable=1)
+        if periods:
+            result = f.set_schedule(periods=periods, enable=1)
+        else:
+            period = f.set_period(0, 24, "SelfUse", min_soc=10)
+            result = f.set_schedule(periods=[period], enable=1)
 
-            print(f"Enable result: {result}")
-        except Exception as e:
-            print(f"Error enabling scheduler: {e}")
-            sys.exit(1)
-    else:
-        print("Unknown action. Use 'on'/'true' or 'off'/'false'")
-        sys.exit(1)
+        print(f"Result: {result}")
 
     print("Done.")
 
