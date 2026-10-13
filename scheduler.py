@@ -1,59 +1,65 @@
 import os
 import sys
-import foxesscloud.foxesscloud as f
+import time
+import foxesscloud.openapi as f   # important: use openapi
 
 def main():
     api_key = os.getenv("FOX_API_KEY")
-    username = os.getenv("FOX_USERNAME")
-    password = os.getenv("FOX_PASSWORD")
+    device_sn = os.getenv("FOX_DEVICE_SN", "60HD103058XM117")
 
     if not api_key:
-        print("ERROR: FOX_API_KEY environment variable not set.")
+        print("ERROR: FOX_API_KEY secret is missing")
         sys.exit(1)
 
-    # Configure authentication
     f.api_key = api_key
-    if username:
-        f.username = username
-    if password:
-        f.password = password
-
-    action = sys.argv[1] if len(sys.argv) > 1 else "off"
-    print(f"Executing GitHub Action -> Action: {action}")
-
-    # Explicitly bind your H3 Smart Inverter serial number
-    device_sn = "60HD103058XM117"
-    print(f"Target Inverter SN: {device_sn}")
     f.device_sn = device_sn
 
-    # Initialize schedule session state
+    action = sys.argv[1] if len(sys.argv) > 1 else "off"
+    print(f"=== Fox ESS Scheduler Control ===")
+    print(f"Action requested : {action}")
+    print(f"Inverter SN      : {device_sn}")
+
+    # Load current schedule state (required by the library)
     try:
-        f.get_schedule()
+        schedule = f.get_schedule()
+        print(f"Current scheduler enable flag: {schedule.get('enable') if schedule else 'unknown'}")
     except Exception as e:
-        print(f"get_schedule note: {e}")
+        print(f"Warning while reading schedule: {e}")
 
-    if action == "off":
-        print("Disabling Mode Scheduler...")
+    if action.lower() == "off":
+        print("→ Disabling Mode Scheduler (this should put the inverter into Self-use)...")
         try:
-            # Pass an empty list with enable=0 to fully turn off Mode Scheduler
-            res_sched = f.set_schedule([], enable=0)
-            print(f"Disable schedule result: {res_sched}")
+            result = f.set_schedule(enable=0)   # This is the correct way
+            print(f"Disable result: {result}")
         except Exception as e:
-            print(f"Disable schedule error: {e}")
+            print(f"Error disabling scheduler: {e}")
+            sys.exit(1)
 
-        print("Switching inverter work mode to SelfUse...")
+    elif action.lower() == "on":
+        print("→ Enabling Mode Scheduler...")
+        # You must supply at least one period when enabling.
+        # Here we just re-enable whatever is already configured on the inverter.
         try:
-            res_mode = f.set_work_mode('SelfUse')
-            print(f"Set work mode result: {res_mode}")
+            # First make sure we have the current periods
+            schedule = f.get_schedule()
+            periods = schedule.get('periods') if schedule else None
+
+            if periods:
+                result = f.set_schedule(periods=periods, enable=1)
+            else:
+                # Fallback – enable with a full-day SelfUse period
+                period = f.set_period(0, 24, "SelfUse", min_soc=10)
+                result = f.set_schedule(periods=[period], enable=1)
+
+            print(f"Enable result: {result}")
         except Exception as e:
-            print(f"Set work mode error: {e}")
+            print(f"Error enabling scheduler: {e}")
+            sys.exit(1)
     else:
-        print("Switching work mode to FeedInFirst...")
-        try:
-            res_mode = f.set_work_mode('FeedInFirst')
-            print(f"Set work mode result: {res_mode}")
-        except Exception as e:
-            print(f"Set work mode error: {e}")
+        print("Unknown action. Use 'on' or 'off'")
+        sys.exit(1)
+
+    print("Done.")
 
 if __name__ == "__main__":
     main()
