@@ -1,53 +1,50 @@
-import os
-import sys
-import foxesscloud.openapi as f
+name: Fox ESS Battery Automation
 
-# Grab the secret key now that it's successfully configured in GitHub
-f.api_key = os.environ.get("FOX_API_KEY")
-f.device_sn = "60HD103058XM117"
+on:
+  schedule:
+    # 10:00 PM AEDT (11:00 UTC) -> Turn OFF
+    - cron: '0 11 * * *'
+    # 10:00 AM AEDT (23:00 UTC) -> Turn ON
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to run (on/off)'
+        required: true
+        default: 'off'
+        type: choice
+        options:
+          - 'off'
+          - 'on'
 
+jobs:
+  run-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-def main():
-  try:
-    print("Connecting to Fox ESS Cloud...")
-    # Step 1: Initialize device session state
-    f.get_device()
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    # Step 2: Fetch current schedule (required by library internals)
-    f.get_schedule()
+      - name: Install dependencies
+        run: pip install foxesscloud requests matplotlib
 
-    # Read action from GitHub Actions command-line argument
-    if len(sys.argv) > 1:
-      action = sys.argv[1].lower()
-    else:
-      action = os.environ.get("ACTION_TYPE", "off").lower()
-
-    print(f"Executing action: {action}")
-
-    if action == "off":
-      print(
-          "Disabling Mode Scheduler and switching to Self-Use mode for"
-          " overnight..."
-      )
-      # Pass an empty list [] and enable=0 to clear and disable schedules
-      res_sched = f.set_schedule([], enable=0)
-      print("Schedule Disable API Result:", res_sched)
-
-      # Explicitly set work mode to Self-Use so your mobile app updates instantly
-      res_mode = f.set_work_mode("SelfUse")
-      print("Work Mode API Result:", res_mode)
-
-    elif action == "on":
-      print("Enabling Mode Scheduler...")
-      res = f.set_schedule(enable=1)
-      print("Schedule Enable API Result:", res)
-    else:
-      print(f"Unknown action specified: {action}")
-
-  except Exception as e:
-    print(f"Error executing command: {str(e)}")
-    sys.exit(1)
-
-
-if __name__ == "__main__":
-  main()
+      - name: Determine and Run Action
+        env:
+          FOX_API_KEY: ${{ secrets.FOX_API_KEY }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python scheduler.py ${{ github.event.inputs.action }}
+          else
+            CURRENT_HOUR=$(date -u +%H)
+            if [ "$CURRENT_HOUR" -ge 22 ] || [ "$CURRENT_HOUR" -le 1 ]; then
+              python scheduler.py on
+            elif [ "$CURRENT_HOUR" -ge 10 ] && [ "$CURRENT_HOUR" -le 13 ]; then
+              python scheduler.py off
+            else
+              python scheduler.py on
+            fi
+          fi
