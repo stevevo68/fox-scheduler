@@ -26,21 +26,22 @@ def main():
     print(f"Target Inverter SN: {device_sn}")
     f.device_sn = device_sn
 
-    # Initialize schedule session state (required before schedule/mode calls)
+    # Initialize schedule session state
     try:
         f.get_schedule()
     except Exception as e:
-        print(f"Note on get_schedule: {e}")
+        print(f"get_schedule note: {e}")
 
     if action == "off":
-        print("Disabling Mode Scheduler and switching to SelfUse...")
+        print("Disabling Mode Scheduler...")
         try:
-            # Disable active schedule / Mode Scheduler lockout
-            res_sched = f.set_schedule(enable=0)
+            # Pass an empty list with enable=0 to fully turn off Mode Scheduler
+            res_sched = f.set_schedule([], enable=0)
             print(f"Disable schedule result: {res_sched}")
         except Exception as e:
-            print(f"Disable schedule note: {e}")
-            
+            print(f"Disable schedule error: {e}")
+
+        print("Switching inverter work mode to SelfUse...")
         try:
             res_mode = f.set_work_mode('SelfUse')
             print(f"Set work mode result: {res_mode}")
