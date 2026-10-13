@@ -36,5 +36,5 @@ def main():
     print("Error executing command:", str(e))
 
 
-If __name__ == "__main__":
+if __name__ == "__main__":
   main()
