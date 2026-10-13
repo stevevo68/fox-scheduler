@@ -35,6 +35,8 @@ jobs:
       - name: Determine and Run Action
         env:
           FOX_API_KEY: ${{ secrets.FOX_API_KEY }}
+          FOX_USERNAME: ${{ secrets.FOX_USERNAME }}
+          FOX_PASSWORD: ${{ secrets.FOX_PASSWORD }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             python scheduler.py ${{ github.event.inputs.action }}
