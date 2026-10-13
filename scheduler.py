@@ -1,7 +1,6 @@
 import os
 import sys
-import time
-import foxesscloud.openapi as f   # important: use openapi
+import foxesscloud.openapi as f
 
 def main():
     api_key = os.getenv("FOX_API_KEY")
@@ -19,35 +18,32 @@ def main():
     print(f"Action requested : {action}")
     print(f"Inverter SN      : {device_sn}")
 
-    # Load current schedule state (required by the library)
+    # Load current schedule state
     try:
         schedule = f.get_schedule()
         print(f"Current scheduler enable flag: {schedule.get('enable') if schedule else 'unknown'}")
     except Exception as e:
         print(f"Warning while reading schedule: {e}")
 
-    if action.lower() == "off":
-        print("→ Disabling Mode Scheduler (this should put the inverter into Self-use)...")
+    if action.lower() in ["off", "false", "0"]:
+        print("→ Disabling Mode Scheduler (Self-use mode)...")
         try:
-            result = f.set_schedule(enable=0)   # This is the correct way
+            result = f.set_schedule(enable=0)
             print(f"Disable result: {result}")
         except Exception as e:
             print(f"Error disabling scheduler: {e}")
             sys.exit(1)
 
-    elif action.lower() == "on":
+    elif action.lower() in ["on", "true", "1"]:
         print("→ Enabling Mode Scheduler...")
-        # You must supply at least one period when enabling.
-        # Here we just re-enable whatever is already configured on the inverter.
         try:
-            # First make sure we have the current periods
             schedule = f.get_schedule()
             periods = schedule.get('periods') if schedule else None
 
             if periods:
                 result = f.set_schedule(periods=periods, enable=1)
             else:
-                # Fallback – enable with a full-day SelfUse period
+                # Fallback: full day SelfUse
                 period = f.set_period(0, 24, "SelfUse", min_soc=10)
                 result = f.set_schedule(periods=[period], enable=1)
 
@@ -56,7 +52,7 @@ def main():
             print(f"Error enabling scheduler: {e}")
             sys.exit(1)
     else:
-        print("Unknown action. Use 'on' or 'off'")
+        print("Unknown action. Use 'on'/'true' or 'off'/'false'")
         sys.exit(1)
 
     print("Done.")
