@@ -1,50 +1,61 @@
-name: Fox ESS Mode Scheduler Toggle
+import os
+import sys
+import foxesscloud.openapi as f
 
-on:
-  schedule:
-    # 10:00 PM AEDT = 11:00 UTC
-    - cron: '0 11 * * *'   # Turn OFF (Self-use)
-    # 10:00 AM AEDT = 23:00 UTC (previous day)
-    - cron: '0 23 * * *'   # Turn ON (Mode Scheduler)
-  workflow_dispatch:
-    inputs:
-      action:
-        description: 'Action to run'
-        required: true
-        default: 'off'
-        type: choice
-        options:
-          - off
-          - on
+def main():
+    api_key = os.getenv("FOX_API_KEY")
+    device_sn = os.getenv("FOX_DEVICE_SN", "60HD103058XM117")
 
-jobs:
-  toggle:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    if not api_key:
+        print("ERROR: FOX_API_KEY secret is missing")
+        sys.exit(1)
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+    f.api_key = api_key
+    f.device_sn = device_sn
 
-      - name: Install foxesscloud
-        run: pip install foxesscloud
+    action = sys.argv[1] if len(sys.argv) > 1 else "off"
+    print(f"=== Fox ESS Scheduler Control ===")
+    print(f"Action requested : {action}")
+    print(f"Inverter SN      : {device_sn}")
 
-      - name: Run scheduler script
-        env:
-          FOX_API_KEY: ${{ secrets.FOX_API_KEY }}
-          FOX_DEVICE_SN: ${{ secrets.FOX_DEVICE_SN }}   # optional, defaults in script
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python scheduler.py ${{ github.event.inputs.action }}
-          else
-            # Scheduled runs
-            HOUR=$(date -u +%H)
-            if [ "$HOUR" = "11" ]; then
-              python scheduler.py off
-            else
-              python scheduler.py on
-            fi
-          fi
+    # Load current schedule state
+    try:
+        schedule = f.get_schedule()
+        print(f"Current scheduler enable flag: {schedule.get('enable') if schedule else 'unknown'}")
+    except Exception as e:
+        print(f"Warning while reading schedule: {e}")
+
+    if action.lower() in ["off", "false", "0"]:
+        print("→ Disabling Mode Scheduler (Self-use mode)...")
+        try:
+            result = f.set_schedule(enable=0)
+            print(f"Disable result: {result}")
+        except Exception as e:
+            print(f"Error disabling scheduler: {e}")
+            sys.exit(1)
+
+    elif action.lower() in ["on", "true", "1"]:
+        print("→ Enabling Mode Scheduler...")
+        try:
+            schedule = f.get_schedule()
+            periods = schedule.get('periods') if schedule else None
+
+            if periods:
+                result = f.set_schedule(periods=periods, enable=1)
+            else:
+                # Fallback: full day SelfUse
+                period = f.set_period(0, 24, "SelfUse", min_soc=10)
+                result = f.set_schedule(periods=[period], enable=1)
+
+            print(f"Enable result: {result}")
+        except Exception as e:
+            print(f"Error enabling scheduler: {e}")
+            sys.exit(1)
+    else:
+        print("Unknown action. Use 'on'/'true' or 'off'/'false'")
+        sys.exit(1)
+
+    print("Done.")
+
+if __name__ == "__main__":
+    main()
