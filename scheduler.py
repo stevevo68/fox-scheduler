@@ -1,48 +1,76 @@
+import hashlib
 import os
 import sys
-import foxesscloud.openapi as f
+import time
+import requests
 
-f.api_key = os.environ.get("FOX_API_KEY")
-f.device_sn = "60HD103058XM117"
+API_KEY = os.environ.get("FOX_API_KEY")
+DEVICE_SN = "60HD103058XM117"
+BASE_URL = "https://www.foxesscloud.com"
+
+
+def get_signature(path, token):
+  """Generates the required signature headers for Fox ESS OpenAPI."""
+  timestamp = str(int(time.time() * 1000))
+  signature_str = f"{path}\r\n{token}\r\n{timestamp}"
+  signature = hashlib.md5(signature_str.encode("utf-8")).hexdigest()
+
+  return {
+      "token": token,
+      "timestamp": timestamp,
+      "signature": signature,
+      "lang": "en",
+      "Content-Type": "application/json",
+      # CRITICAL: Custom User-Agent prevents Fox ESS / Cloudflare from silently dropping POST requests
+      "User-Agent": (
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      ),
+  }
+
+
+def set_mode_scheduler(enable: int):
+  """Calls the Fox ESS Open API to enable (1) or disable (0) the Mode Scheduler."""
+  path = "/op/v0/device/scheduler/enable"
+  url = f"{BASE_URL}{path}"
+
+  headers = get_signature(path, API_KEY)
+  payload = {"sn": DEVICE_SN, "enable": enable}
+
+  print(f"Sending request to {url} with enable={enable}...")
+  response = requests.post(url, json=payload, headers=headers, timeout=15)
+
+  print(f"HTTP Status Code: {response.status_code}")
+  print(f"Raw Response Body: {response.text}")
+
+  res_json = response.json()
+  if res_json.get("errno") == 0:
+    print("SUCCESS: Fox ESS Cloud accepted the schedule command!")
+  else:
+    print(f"FAILURE: Fox ESS returned error code: {res_json}")
 
 
 def main():
-  try:
-    print("Connecting to Fox ESS Cloud...")
-    f.get_device()
-    f.get_schedule()
-
-    # Read action from command-line argument passed by GitHub Actions
-    if len(sys.argv) > 1:
-      action = sys.argv[1].lower()
-    else:
-      action = os.environ.get("ACTION_TYPE", "off").lower()
-
-    print(f"Executing action: {action}")
-
-    if action == "off":
-      print(
-          "Disabling Mode Scheduler and switching to Self-Use mode for"
-          " overnight..."
-      )
-      # Pass an empty list [] as the first argument to clear and disable schedules
-      res_sched = f.set_schedule([], enable=0)
-      print("Schedule Disable API Result:", res_sched)
-
-      # Explicitly set work mode to Self-Use so the app updates instantly
-      res_mode = f.set_work_mode("SelfUse")
-      print("Work Mode API Result:", res_mode)
-
-    elif action == "on":
-      print("Enabling Mode Scheduler...")
-      res = f.set_schedule(enable=1)
-      print("Schedule Enable API Result:", res)
-    else:
-      print(f"Unknown action specified: {action}")
-
-  except Exception as e:
-    print(f"Error executing command: {str(e)}")
+  if not API_KEY:
+    print("ERROR: FOX_API_KEY environment variable is missing!")
     sys.exit(1)
+
+  # Read command line argument
+  if len(sys.argv) > 1:
+    action = sys.argv[1].lower()
+  else:
+    action = os.environ.get("ACTION_TYPE", "off").lower()
+
+  print(f"Executing GitHub Action for device {DEVICE_SN} -> Action: {action}")
+
+  if action == "off":
+    print("Disabling Mode Scheduler...")
+    set_mode_scheduler(0)
+  elif action == "on":
+    print("Enabling Mode Scheduler...")
+    set_mode_scheduler(1)
+  else:
+    print(f"Unknown action: {action}")
 
 
 if __name__ == "__main__":
