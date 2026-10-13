@@ -1,27 +1,27 @@
-name: Fox ESS Battery Automation
+name: Fox ESS Mode Scheduler Toggle
 
 on:
   schedule:
-    # 10:00 PM AEDT (11:00 UTC) -> Turn OFF
-    - cron: '0 11 * * *'
-    # 10:00 AM AEDT (23:00 UTC) -> Turn ON
-    - cron: '0 23 * * *'
+    # 10:00 PM AEDT = 11:00 UTC
+    - cron: '0 11 * * *'   # Turn OFF (Self-use)
+    # 10:00 AM AEDT = 23:00 UTC (previous day)
+    - cron: '0 23 * * *'   # Turn ON (Mode Scheduler)
   workflow_dispatch:
     inputs:
       action:
-        description: 'Action to run (on/off)'
+        description: 'Action to run'
         required: true
         default: 'off'
         type: choice
         options:
-          - 'off'
-          - 'on'
+          - off
+          - on
 
 jobs:
-  run-scheduler:
+  toggle:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -29,22 +29,20 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install foxesscloud requests matplotlib
+      - name: Install foxesscloud
+        run: pip install foxesscloud
 
-      - name: Determine and Run Action
+      - name: Run scheduler script
         env:
           FOX_API_KEY: ${{ secrets.FOX_API_KEY }}
-          FOX_USERNAME: ${{ secrets.FOX_USERNAME }}
-          FOX_PASSWORD: ${{ secrets.FOX_PASSWORD }}
+          FOX_DEVICE_SN: ${{ secrets.FOX_DEVICE_SN }}   # optional, defaults in script
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             python scheduler.py ${{ github.event.inputs.action }}
           else
-            CURRENT_HOUR=$(date -u +%H)
-            if [ "$CURRENT_HOUR" -ge 22 ] || [ "$CURRENT_HOUR" -le 1 ]; then
-              python scheduler.py on
-            elif [ "$CURRENT_HOUR" -ge 10 ] && [ "$CURRENT_HOUR" -le 13 ]; then
+            # Scheduled runs
+            HOUR=$(date -u +%H)
+            if [ "$HOUR" = "11" ]; then
               python scheduler.py off
             else
               python scheduler.py on
