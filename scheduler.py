@@ -15,7 +15,7 @@ def main():
     f.api_key = api_key
     f.device_sn = device_sn
 
-    # Real Sydney time (handles daylight saving automatically)
+    # Current Sydney time
     now = datetime.now(ZoneInfo("Australia/Sydney"))
     hour = now.hour
 
@@ -28,12 +28,11 @@ def main():
         action = sys.argv[1].lower()
         print(f"Manual action: {action}")
     else:
-        if hour == 14:          # 2:00 PM Sydney → OFF
-            action = "off"
-        elif hour == 10:        # 10:00 AM Sydney → ON
-            action = "on"
+        # Automatic: only act at 9:00 PM Sydney
+        if hour == 21:
+            action = "off"          # Switch to Self-use
         else:
-            print("Not 10:00 AM or 2:00 PM in Sydney — nothing to do.")
+            print("Not 9:00 PM in Sydney — nothing to do.")
             return
 
     print(f"Action      : {action}")
@@ -45,21 +44,18 @@ def main():
         print(f"Warning: {e}")
 
     if action in ["off", "false", "0"]:
-        print("→ Disabling Mode Scheduler (Self-use)...")
+        print("→ Switching to Self-use (disabling Mode Scheduler)...")
         result = f.set_schedule(enable=0)
         print(f"Result: {result}")
-
-    elif action in ["on", "true", "1"]:
+    else:
         print("→ Enabling Mode Scheduler...")
         schedule = f.get_schedule()
         periods = schedule.get('periods') if schedule else None
-
         if periods:
             result = f.set_schedule(periods=periods, enable=1)
         else:
             period = f.set_period(0, 24, "SelfUse", min_soc=10)
             result = f.set_schedule(periods=[period], enable=1)
-
         print(f"Result: {result}")
 
     print("Done.")
