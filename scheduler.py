@@ -28,11 +28,13 @@ def main():
         action = sys.argv[1].lower()
         print(f"Manual action: {action}")
     else:
-        # Automatic: only act at 9:00 PM Sydney
-        if hour == 21:
-            action = "off"          # Switch to Self-use
+        # Automatic decision
+        if hour == 10:          # 10:00 AM → ON
+            action = "on"
+        elif hour == 21:        # 9:00 PM → OFF (Self-use)
+            action = "off"
         else:
-            print("Not 9:00 PM in Sydney — nothing to do.")
+            print("Not 10:00 AM or 9:00 PM in Sydney — nothing to do.")
             return
 
     print(f"Action      : {action}")
@@ -47,15 +49,18 @@ def main():
         print("→ Switching to Self-use (disabling Mode Scheduler)...")
         result = f.set_schedule(enable=0)
         print(f"Result: {result}")
-    else:
+
+    elif action in ["on", "true", "1"]:
         print("→ Enabling Mode Scheduler...")
         schedule = f.get_schedule()
         periods = schedule.get('periods') if schedule else None
+
         if periods:
             result = f.set_schedule(periods=periods, enable=1)
         else:
             period = f.set_period(0, 24, "SelfUse", min_soc=10)
             result = f.set_schedule(periods=[period], enable=1)
+
         print(f"Result: {result}")
 
     print("Done.")
