@@ -15,7 +15,6 @@ def main():
     f.api_key = api_key
     f.device_sn = device_sn
 
-    # Current Sydney time
     now = datetime.now(ZoneInfo("Australia/Sydney"))
     hour = now.hour
 
@@ -23,19 +22,18 @@ def main():
     print(f"Sydney time : {now.strftime('%Y-%m-%d %H:%M %Z')}")
     print(f"Inverter SN : {device_sn}")
 
-    # Manual force from GitHub button
+    # Manual force from the Run workflow button
     if len(sys.argv) > 1:
         action = sys.argv[1].lower()
         print(f"Manual action: {action}")
     else:
-        # Automatic decision
-        if hour == 10:          # 10:00 AM → ON
+        # Automatic based on current Sydney time of day
+        # 10:00 AM – 9:00 PM → ON
+        # 9:00 PM – 10:00 AM → OFF
+        if 10 <= hour < 21:
             action = "on"
-        elif hour == 21:        # 9:00 PM → OFF (Self-use)
-            action = "off"
         else:
-            print("Not 10:00 AM or 9:00 PM in Sydney — nothing to do.")
-            return
+            action = "off"
 
     print(f"Action      : {action}")
 
